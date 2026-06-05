@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
-# --- PARAMETRE KONTROLÜ ---
+# --- PARAMETER CHECK ---
 RESET=false
 if [[ "$1" == "--reset" ]]; then
   RESET=true
 fi
 
-# --- 1. KULLANICIYI DOĞRU TESPİT ETME (SUDO FIX) ---
+# --- 1. RESOLVE USER (SUDO FIX) ---
 if [ "$SUDO_USER" ]; then
     REAL_USER=$SUDO_USER
 else
@@ -21,54 +21,53 @@ COMPOSE_FILE="$BASE_DIR/docker-compose.yml"
 
 echo "🔧 Linux Home Server Installer (v1.0 - x64 Edition)"
 echo "-------------------------------------------------------------------"
-echo "🖨️  Mimari: x86_64 (Intel/AMD) uyumlu."
-echo "👤  Kullanıcı: $REAL_USER (UID: $REAL_UID)"
-echo "🌍  Network: Local IP + Tailscale IP desteği."
+echo "🖨️  Architecture: x86_64 (Intel/AMD) compatible."
+echo "👤  User: $REAL_USER (UID: $REAL_UID)"
+echo "🌍  Network: Local IP + Tailscale IP support."
 echo "-------------------------------------------------------------------"
 
-# --- 2. ŞİFRELERİ AL ---
-echo "🔐 KURULUM ÖNCESİ YAPILANDIRMA"
+# --- 2. CONFIGURATION PROMPTS ---
+echo "🔐 PRE-INSTALLATION CONFIGURATION"
 echo ""
 while true; do
-    read -p "👉 qBittorrent arayüz şifresi ne olsun?: " QBIT_PASS
-    if [ -z "$QBIT_PASS" ]; then echo "❌ Şifre boş olamaz!"; else break; fi
+    read -p "👉 Choose a password for the qBittorrent WebUI: " QBIT_PASS
+    if [ -z "$QBIT_PASS" ]; then echo "❌ Password cannot be empty!"; else break; fi
 done
 echo ""
-echo "✅ Bilgiler alındı."
+echo "✅ Configuration successfully saved."
 echo "-------------------------------------------------------------------"
 
-# --- 3. RESET (TEMİZLİK) ---
+# --- 3. RESET (CLEANUP) ---
 if $RESET; then
-  echo "⚠️  RESET MODE: Temizlik yapılıyor..."
+  echo "⚠️  RESET MODE: Cleaning up existing configuration..."
   if command -v docker >/dev/null 2>&1; then
     if [ -f "$COMPOSE_FILE" ]; then docker compose -f "$COMPOSE_FILE" down -v || true; fi
     docker stop $(docker ps -a -q) 2>/dev/null || true
     docker rm $(docker ps -a -q) 2>/dev/null || true
-    echo "🧹 Hatalı imajlar temizleniyor..."
+    echo "🧹 Cleaning unused images..."
     docker image prune -a -f >/dev/null 2>&1
     docker volume rm portainer_data 2>/dev/null || true
   fi
   if [ -d "$BASE_DIR" ]; then
-      echo "🗑️ Dosyalar siliniyor..."
+      echo "🗑️ Deleting files..."
       sudo rm -rf "$BASE_DIR"
   fi
-  echo "🧹 Temizlik tamamlandı."
+  echo "🧹 Cleanup complete."
 fi
 
-# --- 4. SİSTEM VE YAZICI ---
-echo "📦 Sistem güncelleniyor ve GEREKLİ PAKETLER kuruluyor..."
+# --- 4. SYSTEM AND PRINTER DEPENDENCIES ---
+echo "📦 Updating system and installing required packages..."
 sudo apt update -y >/dev/null 2>&1
-# x64 sistemlerde yazıcı sürücüleri ve temel araçlar
 sudo apt install -y curl git net-tools ntfs-3g python3 cups hplip jq >/dev/null 2>&1
 sudo usermod -aG lpadmin $REAL_USER
-echo "🌍 Yazıcı sunucusu ağa açılıyor..."
+echo "🌍 Enabling printer sharing on network..."
 sudo cupsctl --remote-any
 sudo systemctl enable cups
 sudo systemctl restart cups
 
-# --- 5. DOCKER ---
+# --- 5. DOCKER SETUP ---
 if ! command -v docker >/dev/null 2>&1; then
-  echo "🐳 Docker kuruluyor..."
+  echo "🐳 Installing Docker..."
   curl -fsSL https://get.docker.com | sh
   sudo usermod -aG docker $REAL_USER
 fi
@@ -77,18 +76,17 @@ sudo systemctl enable docker
 sudo systemctl start docker
 sudo chmod 666 /var/run/docker.sock
 
-# --- 6. DOSYA YAPISI ---
-echo "📁 Dizinler oluşturuluyor..."
+# --- 6. DIRECTORY STRUCTURE ---
+echo "📁 Creating directories..."
 mkdir -p "$BASE_DIR"/{data,nginx,pihole,filebrowser,jellyfin,qbittorrent}
 mkdir -p "$BASE_DIR/data"/{downloads,movies,series}
-# Harici disk bağlama noktası (Opsiyonel)
 sudo mkdir -p /mnt/external
 sudo chmod 777 /mnt/external
 touch "$BASE_DIR/filebrowser/filebrowser.db"
 chmod 666 "$BASE_DIR/filebrowser/filebrowser.db"
 
-# --- 7. DOCKER COMPOSE ---
-echo "📝 Docker konfigürasyonu hazırlanıyor (x64)..."
+# --- 7. DOCKER COMPOSE CONFIGURATION ---
+echo "📝 Generating Docker compose file (x64)..."
 cat <<EOF > "$COMPOSE_FILE"
 services:
   portainer:
@@ -153,7 +151,7 @@ services:
       - ./jellyfin/cache:/cache
       - ./data:/media
       - /mnt/external:/media/external_disk
-    # x64 Sistemler için Donanım Hızlandırma (Intel/AMD)
+    # Hardware Acceleration (Intel/AMD) for x64 Systems
     devices:
       - /dev/dri:/dev/dri
     environment:
@@ -181,11 +179,11 @@ volumes:
   portainer_data:
 EOF
 
-# --- 8. DASHBOARD OLUŞTURMA ---
-echo "🖼️ Dashboard oluşturuluyor..."
+# --- 8. GENERATING DASHBOARD ---
+echo "🖼️ Generating dashboard..."
 cat <<EOF > "$BASE_DIR/nginx/index.html"
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home Server</title>
@@ -204,12 +202,12 @@ h1 { color: var(--text-color); margin-bottom: 40px; font-size: 2.5rem; letter-sp
 <body>
 <h1>🏠 Home Server Dashboard</h1>
 <div class="container">
-<a id="link-portainer" href="#" class="card"><span class="icon">📦</span><div class="title">Portainer</div><div class="desc">Sistem Yönetimi</div></a>
-<a id="link-files" href="#" class="card"><span class="icon">📁</span><div class="title">Dosyalar</div><div class="desc">File Browser</div></a>
-<a id="link-pihole" href="#" class="card"><span class="icon">🛡️</span><div class="title">Pi-hole</div><div class="desc">Reklam Engelleyici</div></a>
-<a id="link-jellyfin" href="#" class="card"><span class="icon">🎬</span><div class="title">Jellyfin</div><div class="desc">Medya Merkezi</div></a>
-<a id="link-qbit" href="#" class="card"><span class="icon">⬇️</span><div class="title">qBittorrent</div><div class="desc">İndirme Yöneticisi</div></a>
-<a id="link-cups" href="#" class="card"><span class="icon">🖨️</span><div class="title">Yazıcı</div><div class="desc">CUPS Paneli</div></a>
+<a id="link-portainer" href="#" class="card"><span class="icon">📦</span><div class="title">Portainer</div><div class="desc">System Management</div></a>
+<a id="link-files" href="#" class="card"><span class="icon">📁</span><div class="title">Files</div><div class="desc">File Browser</div></a>
+<a id="link-pihole" href="#" class="card"><span class="icon">🛡️</span><div class="title">Pi-hole</div><div class="desc">Ad Blocker</div></a>
+<a id="link-jellyfin" href="#" class="card"><span class="icon">🎬</span><div class="title">Jellyfin</div><div class="desc">Media Center</div></a>
+<a id="link-qbit" href="#" class="card"><span class="icon">⬇️</span><div class="title">qBittorrent</div><div class="desc">Torrent Downloader</div></a>
+<a id="link-cups" href="#" class="card"><span class="icon">🖨️</span><div class="title">Printer</div><div class="desc">CUPS Dashboard</div></a>
 </div>
 <script>
 const host = window.location.hostname;
@@ -224,14 +222,14 @@ document.getElementById('link-cups').href = 'https://' + host + ':631';
 </html>
 EOF
 
-# --- 9. SERVİSLERİ BAŞLAT ---
-echo "🚀 Docker servisleri başlatılıyor..."
+# --- 9. START SERVICES ---
+echo "🚀 Starting Docker services..."
 cd "$BASE_DIR"
 docker compose pull
 docker compose up -d
 
-# --- 10. QBITTORRENT AYARI ---
-echo "⚙️  qBittorrent ayarlanıyor..."
+# --- 10. CONFIGURE QBITTORRENT ---
+echo "⚙️  Configuring qBittorrent..."
 sleep 5
 docker stop qbittorrent >/dev/null 2>&1
 HASHed_PASS=$(python3 -c "import base64, hashlib, os; salt=os.urandom(16); pwd='$QBIT_PASS'.encode(); h=hashlib.pbkdf2_hmac('sha512', pwd, salt, 100000); print(f'@ByteArray({base64.b64encode(salt).decode()}:{base64.b64encode(h).decode()})')")
@@ -249,52 +247,52 @@ WebUI\Port=8082
 WebUI\Username=admin
 EOF
 docker start qbittorrent >/dev/null 2>&1
-echo "✅ qBittorrent ayarlandı."
+echo "✅ qBittorrent configured."
 
-# --- 11. PI-HOLE ŞİFRE AYARI ---
+# --- 11. PI-HOLE PASSWORD CONFIGURATION ---
 echo ""
-echo "🔐 PI-HOLE ŞİFRE AYARI"
-echo "⏳ Pi-hole bekleniyor..."
+echo "🔐 PI-HOLE PASSWORD CONFIGURATION"
+echo "⏳ Waiting for Pi-hole to start..."
 MAX_RETRIES=30
 COUNT=0
 while [ $COUNT -lt $MAX_RETRIES ]; do
     if [ "$(docker inspect -f '{{.State.Running}}' pihole 2>/dev/null)" == "true" ]; then
-        echo "✅ Pi-hole aktif!"
+        echo "✅ Pi-hole is active!"
         sleep 5
         docker exec -it pihole pihole setpassword
         break
     fi
-    echo "   ...Bekleniyor ($COUNT/$MAX_RETRIES)"
+    echo "   ...Waiting ($COUNT/$MAX_RETRIES)"
     sleep 2
     COUNT=$((COUNT+1))
 done
 
-# --- 12. SON İZİN DÜZENLEMESİ (GARANTİ ÇÖZÜM) ---
-echo "🔧 Son klasör izinleri düzenleniyor..."
+# --- 12. FILE PERMISSIONS CONFIGURATION ---
+echo "🔧 Configuring file permissions..."
 sudo chown -R $REAL_USER:$REAL_USER "$BASE_DIR"
 sudo chmod -R 777 "$BASE_DIR/data"
 sudo chmod -R 777 "$BASE_DIR/nginx"
 
-# --- 13. TAILSCALE ---
+# --- 13. TAILSCALE SETUP ---
 echo "-----------------------------------------------------------------"
 if ! command -v tailscale >/dev/null 2>&1; then
-  echo "⬇️ Tailscale kuruluyor..."
+  echo "⬇️ Installing Tailscale..."
   curl -fsSL https://tailscale.com/install.sh | sh
 fi
 sudo tailscale up || true
 
-# --- 14. BİTİŞ ---
+# --- 14. INSTALLATION COMPLETE ---
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 TS_IP=$(tailscale ip -4 2>/dev/null)
 
 echo ""
-echo "🎉 KURULUM TAMAMLANDI!"
+echo "🎉 INSTALLATION COMPLETE!"
 echo "------------------------------------------------------"
-echo "🏠 YEREL AĞ (LAN):      http://$LOCAL_IP"
+echo "🏠 LOCAL NETWORK (LAN): http://$LOCAL_IP"
 if [ -n "$TS_IP" ]; then
-echo "🌍 TAILSCALE (DIŞ AĞ):  http://$TS_IP"
+echo "🌍 TAILSCALE (EXTERNAL): http://$TS_IP"
 else
-echo "🌍 TAILSCALE:           Bağlı değil ('sudo tailscale up' yapın)"
+echo "🌍 TAILSCALE:           Not connected (Run 'sudo tailscale up')"
 fi
 echo "------------------------------------------------------"
-echo "🛑 YAZICI KURULUMU: 'sudo hp-setup -i' komutunu kullanın."
+echo "🛑 PRINTER SETUP: Run 'sudo hp-setup -i'"

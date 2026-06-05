@@ -2,6 +2,8 @@
 
 **Docker + Tailscale + Media + Download + Network Toolbox**
 
+> **Note:** This is a lightweight script to set up a Dockerized Home Server environment on Linux/Raspberry Pi.
+
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue?style=for-the-badge\&logo=docker)
 ![Raspberry](https://img.shields.io/badge/Raspberry%20Pi-ARM64-red?style=for-the-badge\&logo=raspberrypi)
 ![Linux](https://img.shields.io/badge/Linux-Debian-green?style=for-the-badge\&logo=linux)
